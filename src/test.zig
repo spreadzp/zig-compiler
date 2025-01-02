@@ -352,3 +352,20 @@ test "EXIT instruction" {
     printTestResult("EXIT instruction", passed);
     try std.testing.expect(passed);
 }
+
+test "JIT compilation and execution" {
+    var memory = [_]u8{0} ** 8; // 8-byte memory
+    var stack = [_]u8{0} ** 8; // 8-byte stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Simple program: ADD, EXIT
+    const code = [_]u8{ 0x00, 0x12 };
+    interpreter.registers.r0 = 5;
+    interpreter.registers.r1 = 3;
+    try interpreter.execute(&code);
+
+    // Verify that the ADD instruction was executed
+    const passed = interpreter.registers.r0 == 8; // r0 should be 5 + 3 = 8
+    printTestResult("JIT compilation and execution", passed);
+    try std.testing.expect(passed);
+}
