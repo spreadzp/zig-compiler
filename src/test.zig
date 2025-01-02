@@ -21,39 +21,77 @@ fn printStackFreeSpace(interpreter: *BPFInterpreter) void {
     std.debug.print("Free stack space: {} bytes\n", .{free_space});
 }
 
-test "Verifier (valid program)" {
-    var memory = [_]u8{};
+test "Verifier (valid program with memory access)" {
+    var memory = [_]u8{0} ** 8; // 8-byte memory
     var stack = [_]u8{0} ** 8; // 8-byte stack
     var interpreter = BPFInterpreter.init(&memory, &stack);
 
-    // Valid program: ADD, EXIT
-    const code = [_]u8{ 0x00, 0x12 };
+    // Valid program: LD, ST, EXIT
+    const code = [_]u8{ 0x05, 0x06, 0x12 };
+    interpreter.registers.r1 = 0; // Valid address for LD and ST
     const valid = interpreter.verifyProgram(&code);
-    printTestResult("Verifier (valid program)", valid);
+    printTestResult("Verifier (valid program with memory access)", valid);
     try std.testing.expect(valid);
 }
 
-test "Verifier (invalid program - unknown opcode)" {
-    var memory = [_]u8{};
+test "Verifier (invalid program - out-of-bounds LD)" {
+    var memory = [_]u8{0} ** 8; // 8-byte memory
     var stack = [_]u8{0} ** 8; // 8-byte stack
     var interpreter = BPFInterpreter.init(&memory, &stack);
 
-    // Invalid program: Unknown opcode (0xFF)
-    const code = [_]u8{0xFF};
+    // Invalid program: LD with out-of-bounds address
+    const code = [_]u8{0x05};
+    interpreter.registers.r1 = 5; // Invalid address (5 + 4 > 8)
     const valid = interpreter.verifyProgram(&code);
-    printTestResult("Verifier (invalid program - unknown opcode)", !valid);
+    printTestResult("Verifier (invalid program - out-of-bounds LD)", !valid);
     try std.testing.expect(!valid);
 }
 
-test "Verifier (invalid program - no EXIT)" {
-    var memory = [_]u8{};
+test "Verifier (invalid program - stack overflow)" {
+    var memory = [_]u8{0} ** 8; // 8-byte memory
+    var stack = [_]u8{0} ** 4; // 4-byte stack (too small for PUSH)
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Invalid program: PUSH, EXIT
+    const code = [_]u8{ 0x09, 0x12 };
+    const valid = interpreter.verifyProgram(&code);
+    printTestResult("Verifier (invalid program - stack overflow)", !valid);
+    try std.testing.expect(!valid);
+}
+
+test "Verifier (invalid program - stack underflow)" {
+    var memory = [_]u8{0} ** 8; // 8-byte memory
+    var stack = [_]u8{0} ** 4; // 4-byte stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Invalid program: POP, EXIT
+    const code = [_]u8{ 0x0A, 0x12 };
+    const valid = interpreter.verifyProgram(&code);
+    printTestResult("Verifier (invalid program - stack underflow)", !valid);
+    try std.testing.expect(!valid);
+}
+
+test "Verifier (invalid program - out-of-bounds JMP)" {
+    var memory = [_]u8{0} ** 8; // 8-byte memory
     var stack = [_]u8{0} ** 8; // 8-byte stack
     var interpreter = BPFInterpreter.init(&memory, &stack);
 
-    // Invalid program: ADD (no EXIT)
-    const code = [_]u8{0x00};
+    // Invalid program: JMP +10 (out of bounds)
+    const code = [_]u8{ 0x10, 0x0A };
     const valid = interpreter.verifyProgram(&code);
-    printTestResult("Verifier (invalid program - no EXIT)", !valid);
+    printTestResult("Verifier (invalid program - out-of-bounds JMP)", !valid);
+    try std.testing.expect(!valid);
+}
+
+test "Verifier (invalid program - out-of-bounds CALL)" {
+    var memory = [_]u8{0} ** 8; // 8-byte memory
+    var stack = [_]u8{0} ** 8; // 8-byte stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Invalid program: CALL +10 (out of bounds)
+    const code = [_]u8{ 0x11, 0x0A };
+    const valid = interpreter.verifyProgram(&code);
+    printTestResult("Verifier (invalid program - out-of-bounds CALL)", !valid);
     try std.testing.expect(!valid);
 }
 
@@ -312,5 +350,22 @@ test "EXIT instruction" {
     // Verify that the EXIT instruction terminated the program
     const passed = interpreter.registers.r0 == 5; // r0 should remain 5
     printTestResult("EXIT instruction", passed);
+    try std.testing.expect(passed);
+}
+
+test "JIT compilation and execution" {
+    var memory = [_]u8{0} ** 8; // 8-byte memory
+    var stack = [_]u8{0} ** 8; // 8-byte stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Simple program: ADD, EXIT
+    const code = [_]u8{ 0x00, 0x12 };
+    interpreter.registers.r0 = 5;
+    interpreter.registers.r1 = 3;
+    try interpreter.execute(&code);
+
+    // Verify that the ADD instruction was executed
+    const passed = interpreter.registers.r0 == 8; // r0 should be 5 + 3 = 8
+    printTestResult("JIT compilation and execution", passed);
     try std.testing.expect(passed);
 }
