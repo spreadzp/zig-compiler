@@ -164,3 +164,47 @@ test "ST instruction" {
     printTestResult("ST instruction", passed);
     try std.testing.expect(passed);
 }
+
+test "Stack overflow" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 3; // Small stack (only 3 bytes)
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+    interpreter.registers.r0 = 1;
+
+    const code = [_]u8{0x09}; // PUSH
+    const result = interpreter.execute(&code);
+    std.debug.print("@@@@@Stack overflow '{any}' ", .{result});
+    // Check if the result is the expected error
+    const passed = if (result) |_| false else |err| err == BPFInterpreter.InterpreterError.StackOverflow;
+    printTestResult("Stack overflow", passed);
+    try std.testing.expect(passed);
+}
+
+test "Stack underflow" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 0; // Empty stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    const code = [_]u8{0x0A}; // POP
+    const result = interpreter.execute(&code);
+    std.debug.print("@@@@@Stack underflow '{any}' ", .{result});
+
+    // Check if the result is the expected error
+    const passed = if (result) |_| false else |err| err == BPFInterpreter.InterpreterError.StackUnderflow;
+    printTestResult("Stack underflow", passed);
+}
+
+test "XOR instruction" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+    interpreter.registers.r0 = 0b1100;
+    interpreter.registers.r1 = 0b1010;
+
+    const code = [_]u8{0x08}; // XOR
+    try interpreter.execute(&code);
+
+    const passed = interpreter.registers.r0 == 0b0110;
+    printTestResult("XOR instruction", passed);
+    try std.testing.expect(passed);
+}

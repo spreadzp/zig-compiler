@@ -15,12 +15,7 @@ pub const BPFInterpreter = struct {
         };
     }
 
-    pub const InterpreterError = error{
-        UnknownOpcode,
-        DivisionByZero,
-        MemoryOutOfBounds,
-        StackOverflow,
-    };
+    pub const InterpreterError = error{ UnknownOpcode, DivisionByZero, MemoryOutOfBounds, StackOverflow, StackUnderflow };
 
     pub fn execute(self: *BPFInterpreter, code: []const u8) InterpreterError!void {
         var pc: usize = 0;
@@ -70,6 +65,27 @@ pub const BPFInterpreter = struct {
                     self.registers.r0 |= self.registers.r1;
                     pc += 1;
                 },
+                0x08 => { // XOR
+                    self.registers.r0 ^= self.registers.r1;
+                    pc += 1;
+                },
+                0x09 => { // PUSH
+                    if (self.stack.len < 4) {
+                        return InterpreterError.StackOverflow;
+                    }
+                    std.mem.writeInt(u32, self.stack[0..4], self.registers.r0, std.builtin.Endian.little);
+                    self.stack = self.stack[4..];
+                    pc += 1;
+                },
+                0x0A => { // POP
+                    if (self.stack.len < 4) {
+                        return InterpreterError.StackUnderflow;
+                    }
+                    self.registers.r0 = std.mem.readInt(u32, self.stack[0..4], std.builtin.Endian.little);
+                    self.stack = self.stack[4..];
+                    pc += 1;
+                },
+
                 else => {
                     std.debug.print("Unknown opcode: {}\n", .{opcode});
                     return InterpreterError.UnknownOpcode;
@@ -84,7 +100,7 @@ pub const BPFInterpreter = struct {
         while (pc < code.len) {
             const opcode = code[pc];
             switch (opcode) {
-                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 => { // Valid opcodes: ADD, SUB, AND, MUL, DIV
+                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A => { // Valid opcodes: ADD, SUB, AND, MUL, DIV...
                     pc += 1;
                 },
                 else => {
