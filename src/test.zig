@@ -15,6 +15,12 @@ fn printTestResult(name: []const u8, passed: bool) void {
     }
 }
 
+// Helper function to print the free space in the stack
+fn printStackFreeSpace(interpreter: *BPFInterpreter) void {
+    const free_space = interpreter.stack.len - interpreter.stack_ptr;
+    std.debug.print("Free stack space: {} bytes\n", .{free_space});
+}
+
 test "Verifier (valid program)" {
     var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 };
     var stack = [_]u8{0} ** 1024; // Add a stack
@@ -206,5 +212,40 @@ test "XOR instruction" {
 
     const passed = interpreter.registers.r0 == 0b0110;
     printTestResult("XOR instruction", passed);
+    try std.testing.expect(passed);
+}
+
+test "Stack operations" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 8; // 8-byte stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Initial stack free space
+    printStackFreeSpace(&interpreter);
+
+    // Push two values onto the stack
+    interpreter.registers.r0 = 1;
+    try interpreter.execute(&[_]u8{0x09}); // PUSH
+    printStackFreeSpace(&interpreter); // Print free space after first push
+
+    interpreter.registers.r0 = 2;
+    try interpreter.execute(&[_]u8{0x09}); // PUSH
+    printStackFreeSpace(&interpreter); // Print free space after second push
+
+    // Pop the values and verify
+    try interpreter.execute(&[_]u8{0x0A}); // POP
+    const passed1 = interpreter.registers.r0 == 2;
+    printStackFreeSpace(&interpreter); // Print free space after first pop
+
+    try interpreter.execute(&[_]u8{0x0A}); // POP
+    const passed2 = interpreter.registers.r0 == 1;
+    printStackFreeSpace(&interpreter); // Print free space after second pop
+
+    // Verify that the stack is now empty
+    const passed3 = interpreter.stack_ptr == 0;
+    printStackFreeSpace(&interpreter); // Print free space after all operations
+
+    const passed = passed1 and passed2 and passed3;
+    printTestResult("Stack operations", passed);
     try std.testing.expect(passed);
 }

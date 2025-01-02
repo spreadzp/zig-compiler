@@ -6,12 +6,14 @@ pub const BPFInterpreter = struct {
     registers: BPFRegisters,
     memory: []u8, // Change to mutable slice
     stack: []u8, // Add a stack
+    stack_ptr: usize,
 
     pub fn init(memory: []u8, stack: []u8) BPFInterpreter {
         return BPFInterpreter{
             .registers = BPFRegisters.init(),
             .memory = memory,
             .stack = stack,
+            .stack_ptr = 0, // Initialize stack pointer to 0
         };
     }
 
@@ -70,19 +72,19 @@ pub const BPFInterpreter = struct {
                     pc += 1;
                 },
                 0x09 => { // PUSH
-                    if (self.stack.len < 4) {
+                    if (self.stack_ptr + 4 > self.stack.len) {
                         return InterpreterError.StackOverflow;
                     }
-                    std.mem.writeInt(u32, self.stack[0..4], self.registers.r0, std.builtin.Endian.little);
-                    self.stack = self.stack[4..];
+                    std.mem.writeInt(u32, self.stack[self.stack_ptr..][0..4], self.registers.r0, std.builtin.Endian.little);
+                    self.stack_ptr += 4; // Move stack pointer forward
                     pc += 1;
                 },
                 0x0A => { // POP
-                    if (self.stack.len < 4) {
+                    if (self.stack_ptr < 4) {
                         return InterpreterError.StackUnderflow;
                     }
-                    self.registers.r0 = std.mem.readInt(u32, self.stack[0..4], std.builtin.Endian.little);
-                    self.stack = self.stack[4..];
+                    self.stack_ptr -= 4; // Move stack pointer backward
+                    self.registers.r0 = std.mem.readInt(u32, self.stack[self.stack_ptr..][0..4], std.builtin.Endian.little);
                     pc += 1;
                 },
 
