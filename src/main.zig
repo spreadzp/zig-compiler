@@ -1,27 +1,12 @@
 const std = @import("std");
 const BPFInterpreter = @import("BPFInterpreter.zig").BPFInterpreter;
 
-pub fn main() !void {
-    // Initialize memory and stack
-    var memory = [_]u8{0} ** 8; // 8-byte memory
-    var stack = [_]u8{0} ** 8; // 8-byte stack
-
-    // Initialize the interpreter
+pub fn main() void {
+    var memory = [_]u8{0} ** 12; // 12-byte memory
+    var stack = [_]u8{0} ** 12; // 12-byte stack
     var interpreter = BPFInterpreter.init(&memory, &stack);
+    const code = [_]u8{ 0x00, 0x02, 0x12 }; // Пример BPF-кода (ADD , AND, EXIT)
+    const valid = interpreter.verifyProgram(&code);
 
-    // Example BPF code: ADD and AND
-    const code = [_]u8{
-        0x00, // ADD: r0 += r1
-        0x02, // AND: r0 &= r1
-    };
-
-    // Initialize registers
-    interpreter.registers.r0 = 0b1100; // Example value for r0
-    interpreter.registers.r1 = 0b1010; // Example value for r1
-
-    // Execute the BPF program
-    try interpreter.execute(&code);
-
-    // Print the result
-    std.debug.print("Result: {b}\n", .{interpreter.registers.r0});
+    std.debug.print("Result: {}\n", .{valid});
 }
