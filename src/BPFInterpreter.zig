@@ -17,7 +17,7 @@ pub const BPFInterpreter = struct {
         };
     }
 
-    pub const InterpreterError = error{ UnknownOpcode, DivisionByZero, MemoryOutOfBounds, StackOverflow, StackUnderflow };
+    pub const InterpreterError = error{ UnknownOpcode, DivisionByZero, MemoryOutOfBounds, StackOverflow, StackUnderflow, InvalidJump };
 
     pub fn execute(self: *BPFInterpreter, code: []const u8) InterpreterError!void {
         var pc: usize = 0;
@@ -86,6 +86,37 @@ pub const BPFInterpreter = struct {
                     self.stack_ptr -= 4; // Move stack pointer backward
                     self.registers.r0 = std.mem.readInt(u32, self.stack[self.stack_ptr..][0..4], std.builtin.Endian.little);
                     pc += 1;
+                },
+                0x10 => { // JMP (Jump)
+                    if (pc + 1 >= code.len) {
+                        return InterpreterError.InvalidJump; // Bounds check
+                    }
+                    const offset = @as(i8, @bitCast(code[pc + 1])); // Read the offset (1 byte)
+                    const new_pc = @as(usize, @intCast(@as(isize, @intCast(pc)) + offset)); // Calculate new PC
+                    if (new_pc >= code.len) {
+                        return InterpreterError.InvalidJump; // Bounds check
+                    }
+                    pc = new_pc; // Update PC
+                },
+                0x11 => { // CALL (Call)
+                    if (pc + 1 >= code.len) {
+                        return InterpreterError.InvalidJump; // Bounds check
+                    }
+                    const offset = @as(i8, @bitCast(code[pc + 1])); // Read the offset (1 byte)
+                    const new_pc = @as(usize, @intCast(@as(isize, @intCast(pc)) + offset)); // Calculate new PC
+                    if (new_pc >= code.len) {
+                        return InterpreterError.InvalidJump; // Bounds check
+                    }
+                    // Push the return address (PC + 2) onto the stack
+                    if (self.stack_ptr + 4 > self.stack.len) {
+                        return InterpreterError.StackOverflow;
+                    }
+                    std.mem.writeInt(u32, self.stack[self.stack_ptr..][0..4], @as(u32, @intCast(pc + 2)), std.builtin.Endian.little);
+                    self.stack_ptr += 4; // Move stack pointer forward
+                    pc = new_pc; // Update PC
+                },
+                0x12 => { // EXIT (Exit)
+                    return; // Terminate execution
                 },
 
                 else => {

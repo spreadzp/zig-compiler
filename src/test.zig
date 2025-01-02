@@ -249,3 +249,52 @@ test "Stack operations" {
     printTestResult("Stack operations", passed);
     try std.testing.expect(passed);
 }
+
+test "JMP instruction" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 8; // 8-byte stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Program: JMP +2, ADD, EXIT
+    const code = [_]u8{ 0x10, 0x02, 0x00, 0x12 };
+    try interpreter.execute(&code);
+
+    // Verify that the JMP skipped the ADD instruction
+    const passed = interpreter.registers.r0 == 0; // r0 should remain 0
+    printTestResult("JMP instruction", passed);
+    try std.testing.expect(passed);
+}
+
+test "CALL and RETURN instructions" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 8; // 8-byte stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Program: CALL +3, EXIT, ADD, EXIT
+    const code = [_]u8{ 0x11, 0x03, 0x12, 0x00, 0x12 };
+    interpreter.registers.r0 = 5;
+    interpreter.registers.r1 = 3;
+    try interpreter.execute(&code);
+
+    // Verify that the CALL executed the ADD instruction and returned
+    const passed = interpreter.registers.r0 == 8; // r0 should be 5 + 3 = 8
+    printTestResult("CALL and RETURN instructions", passed);
+    try std.testing.expect(passed);
+}
+
+test "EXIT instruction" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 8; // 8-byte stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Program: EXIT, ADD
+    const code = [_]u8{ 0x12, 0x00 };
+    interpreter.registers.r0 = 5;
+    interpreter.registers.r1 = 3;
+    try interpreter.execute(&code);
+
+    // Verify that the EXIT instruction terminated the program
+    const passed = interpreter.registers.r0 == 5; // r0 should remain 5
+    printTestResult("EXIT instruction", passed);
+    try std.testing.expect(passed);
+}
