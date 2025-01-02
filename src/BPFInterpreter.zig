@@ -136,7 +136,7 @@ pub const BPFInterpreter = struct {
             const opcode = code[pc];
             switch (opcode) {
                 0x09 => { // PUSH
-                    if (stack_ptr + 4 > self.stack.len) {
+                    if (stack_ptr + 4 >= self.stack.len) {
                         std.debug.print("PUSH instruction causes stack overflow\n", .{});
                         return false;
                     }
@@ -144,7 +144,7 @@ pub const BPFInterpreter = struct {
                     pc += 1;
                 },
                 0x0A => { // POP
-                    if (stack_ptr < 4) {
+                    if (stack_ptr <= 4) {
                         std.debug.print("POP instruction causes stack underflow\n", .{});
                         return false;
                     }
