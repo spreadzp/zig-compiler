@@ -5,11 +5,13 @@ const BPFRegisters = @import("logic.zig").BPFRegisters;
 pub const BPFInterpreter = struct {
     registers: BPFRegisters,
     memory: []u8, // Change to mutable slice
+    stack: []u8, // Add a stack
 
-    pub fn init(memory: []u8) BPFInterpreter {
+    pub fn init(memory: []u8, stack: []u8) BPFInterpreter {
         return BPFInterpreter{
             .registers = BPFRegisters.init(),
             .memory = memory,
+            .stack = stack,
         };
     }
 
@@ -17,6 +19,7 @@ pub const BPFInterpreter = struct {
         UnknownOpcode,
         DivisionByZero,
         MemoryOutOfBounds,
+        StackOverflow,
     };
 
     pub fn execute(self: *BPFInterpreter, code: []const u8) InterpreterError!void {
@@ -63,6 +66,10 @@ pub const BPFInterpreter = struct {
                     std.mem.writeInt(u32, self.memory[address..][0..4], self.registers.r0, std.builtin.Endian.little);
                     pc += 1;
                 },
+                0x07 => { // OR
+                    self.registers.r0 |= self.registers.r1;
+                    pc += 1;
+                },
                 else => {
                     std.debug.print("Unknown opcode: {}\n", .{opcode});
                     return InterpreterError.UnknownOpcode;
@@ -77,7 +84,7 @@ pub const BPFInterpreter = struct {
         while (pc < code.len) {
             const opcode = code[pc];
             switch (opcode) {
-                0x00, 0x01, 0x02, 0x03, 0x04 => { // Valid opcodes: ADD, SUB, AND, MUL, DIV
+                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 => { // Valid opcodes: ADD, SUB, AND, MUL, DIV
                     pc += 1;
                 },
                 else => {

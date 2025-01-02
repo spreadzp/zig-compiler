@@ -16,8 +16,9 @@ fn printTestResult(name: []const u8, passed: bool) void {
 }
 
 test "Verifier (valid program)" {
-    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 }; // Use `var` instead of `const`
-    var interpreter = BPFInterpreter.init(&memory); // Use & here
+    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 };
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
     const code = [_]u8{ 0x00, 0x01, 0x02, 0x03, 0x04 }; // ADD, SUB, AND, MUL, DIV
     const valid = interpreter.verifyProgram(&code);
     printTestResult("Verifier (valid program)", valid);
@@ -25,8 +26,9 @@ test "Verifier (valid program)" {
 }
 
 test "Verifier (invalid program)" {
-    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 }; // Use `var` instead of `const`
-    var interpreter = BPFInterpreter.init(&memory); // Use & here
+    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 };
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
     const code = [_]u8{0xFF}; // Unknown opcode
     const valid = interpreter.verifyProgram(&code);
     printTestResult("Verifier (invalid program)", !valid);
@@ -34,8 +36,9 @@ test "Verifier (invalid program)" {
 }
 
 test "ADD instruction" {
-    var memory = [_]u8{}; // Use `var` instead of `const`
-    var interpreter = BPFInterpreter.init(&memory); // Use & here
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
     interpreter.registers.r0 = 5;
     interpreter.registers.r1 = 3;
 
@@ -47,9 +50,25 @@ test "ADD instruction" {
     try std.testing.expect(passed);
 }
 
+test "OR instruction" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+    interpreter.registers.r0 = 0b1100;
+    interpreter.registers.r1 = 0b1010;
+
+    const code = [_]u8{0x07}; // OR
+    try interpreter.execute(&code);
+
+    const passed = interpreter.registers.r0 == 0b1110;
+    printTestResult("OR instruction", passed);
+    try std.testing.expect(passed);
+}
+
 test "AND instruction" {
-    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 }; // Use `var` instead of `const`
-    var interpreter = BPFInterpreter.init(&memory); // Use & here
+    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 };
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
     interpreter.registers.r0 = 0b1100;
     interpreter.registers.r1 = 0b1010;
 
@@ -62,8 +81,9 @@ test "AND instruction" {
 }
 
 test "SUB instruction" {
-    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 }; // Use `var` instead of `const`
-    var interpreter = BPFInterpreter.init(&memory); // Use & here
+    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 };
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
     interpreter.registers.r0 = 10;
     interpreter.registers.r1 = 4;
 
@@ -75,9 +95,24 @@ test "SUB instruction" {
     try std.testing.expect(passed);
 }
 
+test "Division by zero" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+    interpreter.registers.r0 = 10;
+    interpreter.registers.r1 = 0;
+
+    const code = [_]u8{0x04}; // DIV
+    const result = interpreter.execute(&code);
+    const passed = result == BPFInterpreter.InterpreterError.DivisionByZero;
+    printTestResult("Division by zero", passed);
+    try std.testing.expect(passed);
+}
+
 test "MUL instruction" {
-    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 }; // Use `var` instead of `const`
-    var interpreter = BPFInterpreter.init(&memory); // Use & here
+    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 };
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
     interpreter.registers.r0 = 5;
     interpreter.registers.r1 = 3;
 
@@ -90,8 +125,9 @@ test "MUL instruction" {
 }
 
 test "Unknown opcode" {
-    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 }; // Use `var` instead of `const`
-    var interpreter = BPFInterpreter.init(&memory); // Use & here
+    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 };
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
     const code = [_]u8{0xFF}; // Unknown opcode
 
     const result = interpreter.execute(&code);
@@ -102,7 +138,8 @@ test "Unknown opcode" {
 
 test "LD instruction" {
     var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 }; // Little-endian 32-bit value: 1
-    var interpreter = BPFInterpreter.init(&memory);
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
     interpreter.registers.r1 = 0; // Address to load from
 
     const code = [_]u8{0x05}; // LD
@@ -115,7 +152,8 @@ test "LD instruction" {
 
 test "ST instruction" {
     var memory = [_]u8{ 0x00, 0x00, 0x00, 0x00 }; // Initialize memory to 0
-    var interpreter = BPFInterpreter.init(&memory);
+    var stack = [_]u8{0} ** 1024; // Add a stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
     interpreter.registers.r0 = 1; // Value to store
     interpreter.registers.r1 = 0; // Address to store at
 
