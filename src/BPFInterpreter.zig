@@ -128,37 +128,35 @@ pub const BPFInterpreter = struct {
     }
 
     pub fn verifyProgram(self: *BPFInterpreter, code: []const u8) bool {
-        _ = self;
         var pc: usize = 0;
         var has_exit = false;
+        var stack_ptr: usize = 0; // Simulate stack pointer for verification
 
         while (pc < code.len) {
             const opcode = code[pc];
             switch (opcode) {
-                // Valid opcodes
-                0x00,
-                0x01,
-                0x02,
-                0x03,
-                0x04, // ADD, SUB, AND, MUL, DIV
-                0x05,
-                0x06, // LD, ST
-                0x07,
-                0x08, // OR, XOR
-                0x09,
-                0x0A, // PUSH, POP
-                0x10,
-                0x11,
-                0x12,
-                => { // JMP, CALL, EXIT
-                    if (opcode == 0x12) {
-                        has_exit = true; // Mark that the program has an EXIT instruction
+                0x09 => { // PUSH
+                    if (stack_ptr + 4 > self.stack.len) {
+                        std.debug.print("PUSH instruction causes stack overflow\n", .{});
+                        return false;
                     }
+                    stack_ptr += 4;
+                    pc += 1;
+                },
+                0x0A => { // POP
+                    if (stack_ptr < 4) {
+                        std.debug.print("POP instruction causes stack underflow\n", .{});
+                        return false;
+                    }
+                    stack_ptr -= 4;
+                    pc += 1;
+                },
+                0x12 => { // EXIT
+                    has_exit = true; // Mark that the program has an EXIT instruction
                     pc += 1;
                 },
                 else => {
-                    std.debug.print("Invalid opcode: {}\n", .{opcode});
-                    return false; // Unknown opcode
+                    pc += 1;
                 },
             }
         }
