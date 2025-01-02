@@ -130,18 +130,45 @@ pub const BPFInterpreter = struct {
     pub fn verifyProgram(self: *BPFInterpreter, code: []const u8) bool {
         _ = self;
         var pc: usize = 0;
+        var has_exit = false;
+
         while (pc < code.len) {
             const opcode = code[pc];
             switch (opcode) {
-                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A => { // Valid opcodes: ADD, SUB, AND, MUL, DIV...
+                // Valid opcodes
+                0x00,
+                0x01,
+                0x02,
+                0x03,
+                0x04, // ADD, SUB, AND, MUL, DIV
+                0x05,
+                0x06, // LD, ST
+                0x07,
+                0x08, // OR, XOR
+                0x09,
+                0x0A, // PUSH, POP
+                0x10,
+                0x11,
+                0x12,
+                => { // JMP, CALL, EXIT
+                    if (opcode == 0x12) {
+                        has_exit = true; // Mark that the program has an EXIT instruction
+                    }
                     pc += 1;
                 },
                 else => {
                     std.debug.print("Invalid opcode: {}\n", .{opcode});
-                    return false;
+                    return false; // Unknown opcode
                 },
             }
         }
+
+        // Ensure the program has an EXIT instruction
+        if (!has_exit) {
+            std.debug.print("Program does not have an EXIT instruction\n", .{});
+            return false;
+        }
+
         return true;
     }
 };

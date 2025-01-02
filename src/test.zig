@@ -22,22 +22,38 @@ fn printStackFreeSpace(interpreter: *BPFInterpreter) void {
 }
 
 test "Verifier (valid program)" {
-    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 };
-    var stack = [_]u8{0} ** 1024; // Add a stack
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 8; // 8-byte stack
     var interpreter = BPFInterpreter.init(&memory, &stack);
-    const code = [_]u8{ 0x00, 0x01, 0x02, 0x03, 0x04 }; // ADD, SUB, AND, MUL, DIV
+
+    // Valid program: ADD, EXIT
+    const code = [_]u8{ 0x00, 0x12 };
     const valid = interpreter.verifyProgram(&code);
     printTestResult("Verifier (valid program)", valid);
     try std.testing.expect(valid);
 }
 
-test "Verifier (invalid program)" {
-    var memory = [_]u8{ 0x01, 0x00, 0x00, 0x00 };
-    var stack = [_]u8{0} ** 1024; // Add a stack
+test "Verifier (invalid program - unknown opcode)" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 8; // 8-byte stack
     var interpreter = BPFInterpreter.init(&memory, &stack);
-    const code = [_]u8{0xFF}; // Unknown opcode
+
+    // Invalid program: Unknown opcode (0xFF)
+    const code = [_]u8{0xFF};
     const valid = interpreter.verifyProgram(&code);
-    printTestResult("Verifier (invalid program)", !valid);
+    printTestResult("Verifier (invalid program - unknown opcode)", !valid);
+    try std.testing.expect(!valid);
+}
+
+test "Verifier (invalid program - no EXIT)" {
+    var memory = [_]u8{};
+    var stack = [_]u8{0} ** 8; // 8-byte stack
+    var interpreter = BPFInterpreter.init(&memory, &stack);
+
+    // Invalid program: ADD (no EXIT)
+    const code = [_]u8{0x00};
+    const valid = interpreter.verifyProgram(&code);
+    printTestResult("Verifier (invalid program - no EXIT)", !valid);
     try std.testing.expect(!valid);
 }
 
